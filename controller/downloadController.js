@@ -4,6 +4,7 @@ const path = require("path");
 
 exports.downloadController = async (req, res) => {
   const { url } = req.body;
+
   if (!url) {
     return res.status(400).json({ error: "No URL provided" });
   }
@@ -54,3 +55,27 @@ exports.downloadController = async (req, res) => {
   }
 };
 
+exports.deleteController = async (req, res) => {
+  console.log(req.body)
+  const { videos } = req.body;
+
+  if (!videos || !Array.isArray(videos) || videos.length === 0) {
+    return res.status(400).json({ error: "No valid videos array provided." });
+  }
+
+  try {
+    for (const video of videos) {
+      const filePath = path.join(__dirname, "..", "downloads", video);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`Deleted ${video}`);
+      } else {
+        console.log(`File ${video} not found.`);
+      }
+    }
+    res.status(200).json({ message: "Videos deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting videos:", error);
+    res.status(500).json({ error: "Failed to delete videos." });
+  }
+};
