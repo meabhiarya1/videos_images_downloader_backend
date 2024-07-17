@@ -56,7 +56,6 @@ exports.downloadController = async (req, res) => {
 };
 
 exports.deleteController = async (req, res) => {
-  console.log(req.body)
   const { videos } = req.body;
 
   if (!videos || !Array.isArray(videos) || videos.length === 0) {
