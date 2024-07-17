@@ -3,7 +3,7 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const path = require("path");
 const app = express();
-const port = 8080;
+require("dotenv").config();
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
@@ -16,6 +16,6 @@ app.use("/downloads", express.static(path.join(__dirname, "downloads")));
 app.use(require("./routes/downloadRoutes"));
 
 // Start the server
-app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
+app.listen(process.env.PORT, () => {
+  console.log(`Server is running at http://localhost:${process.env.PORT}`);
 });
