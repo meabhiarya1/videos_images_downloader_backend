@@ -1,56 +1,77 @@
-const youtubedl = require("youtube-dl-exec");
-const fs = require("fs");
 const path = require("path");
+const fs = require("fs");
+const youtubedl = require("youtube-dl-exec");
+const ffmpegPath = require("ffmpeg-static");
+const ffmpeg = require("fluent-ffmpeg");
+
+// Set the path to the ffmpeg binary
+ffmpeg.setFfmpegPath(ffmpegPath);
+
 
 exports.downloadController = async (req, res) => {
   const { url } = req.body;
-
-  if (!url) {
-    return res.status(400).json({ error: "No URL provided" });
+  
+  // Check if URL is a YouTube link
+  if (!url || !url.includes("youtube.com")) {
+    return res.status(400).json({ error: "Please provide a valid YouTube URL" });
   }
 
   const videoId = url.substring(url.lastIndexOf("/") + 1);
   const sanitizedVideoId = videoId.replace(/\?/g, "");
 
   try {
-    // Define the output path and file name
-    const timestamp = Date.now(); // Get current timestamp in milliseconds
+    const timestamp = Date.now();
     const outputPath = path.resolve(__dirname, "../downloads");
-    const outputTemplate = `${sanitizedVideoId}-${timestamp}.mp4`;
-    const outputFile = path.join(outputPath, outputTemplate);
+    const outputTemplate = `${sanitizedVideoId}-${timestamp}`;
+    const outputFile = path.join(outputPath, `${outputTemplate}.mp4`);
 
-    // Ensure the downloads directory exists
     if (!fs.existsSync(outputPath)) {
       fs.mkdirSync(outputPath);
     }
 
-    // Use youtube-dl to download the video
-    await youtubedl(url, {
-      format:
-        "bestvideo[height<=1080][ext=mp4]/best[height<=1080][ext=mp4]/best[ext=mp4]/best",
-      output: outputFile,
+    // Use youtube-dl to download video and audio in parallel
+    const videoPromise = youtubedl(url, {
+      format: "bestvideo[height<=1440][ext=mp4]/best",
+      output: path.join(outputPath, `${outputTemplate}-video.mp4`),
     });
 
-    // Find the actual downloaded file name (as it could include extension changes)
-    const files = fs.readdirSync(outputPath);
-    const downloadedFile = files.find((file) =>
-      file.includes(outputTemplate.split(".")[0])
-    );
+    const audioPromise = youtubedl(url, {
+      format: "bestaudio[ext=m4a]/best",
+      output: path.join(outputPath, `${outputTemplate}-audio.m4a`),
+    });
 
-    if (!downloadedFile) {
-      throw new Error("Downloaded file not found");
-    }
+    await Promise.all([videoPromise, audioPromise]);
 
-    res.status(200).json(downloadedFile);
+    // Merge video and audio using ffmpeg
+    ffmpeg()
+      .input(path.join(outputPath, `${outputTemplate}-video.mp4`))
+      .input(path.join(outputPath, `${outputTemplate}-audio.m4a`))
+      .outputOptions("-c:v copy")
+      .outputOptions("-c:a aac")
+      .output(outputFile)
+      .on("end", () => {
+        // Clean up temporary files
+        try {
+          fs.unlinkSync(path.join(outputPath, `${outputTemplate}-video.mp4`));
+          fs.unlinkSync(path.join(outputPath, `${outputTemplate}-audio.m4a`));
+        } catch (err) {
+          console.error("Error cleaning up temporary files:", err);
+        }
+
+        res.status(200).json(path.basename(outputFile));
+      })
+      .on("error", (err) => {
+        console.error("Error merging video and audio:", err);
+        res.status(500).json({ error: "Failed to merge video and audio" });
+      })
+      .run();
   } catch (error) {
-    console.error("Error downloading video:", error);
+    console.error("Error processing request:", error);
 
     if (error.message.includes("No such format")) {
       res.status(400).json({ error: "Invalid URL or format not found" });
-    } else if (error.message.includes("Downloaded file not found")) {
-      res.status(500).json({ error: "Downloaded file not found" });
     } else {
-      res.status(500).json({ error: "Failed to download video" });
+      res.status(500).json({ error: "Failed to process download request" });
     }
   }
 };
@@ -66,8 +87,12 @@ exports.deleteController = async (req, res) => {
     for (const video of videos) {
       const filePath = path.join(__dirname, "..", "downloads", video);
       if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-        console.log(`Deleted ${video}`);
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`Deleted ${video}`);
+        } catch (err) {
+          console.error(`Error deleting file ${video}:`, err);
+        }
       } else {
         console.log(`File ${video} not found.`);
       }
