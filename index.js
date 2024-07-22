@@ -12,8 +12,9 @@ app.use(cors());
 // Serve static files from the 'downloads' directory
 app.use("/downloads", express.static(path.join(__dirname, "downloads")));
 
-// Endpoint to download video from a URL
+// Include routes
 app.use(require("./routes/downloadRoutes"));
+// app.use(require("./routes/authRoutes"));
 
 // Start the server
 app.listen(process.env.PORT, () => {

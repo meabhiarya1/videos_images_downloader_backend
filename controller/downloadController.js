@@ -3,17 +3,24 @@ const fs = require("fs");
 const youtubedl = require("youtube-dl-exec");
 const ffmpegPath = require("ffmpeg-static");
 const ffmpeg = require("fluent-ffmpeg");
+const axios = require("axios");
+// const { alldown, ytdown } = require("nayan-media-downloader");
+const instagramDl = require("@sasmeee/igdl");
 
 // Set the path to the ffmpeg binary
 ffmpeg.setFfmpegPath(ffmpegPath);
 
-
 exports.downloadController = async (req, res) => {
   const { url } = req.body;
-  
+
   // Check if URL is a YouTube link
-  if (!url || !url.includes("youtube.com")) {
-    return res.status(400).json({ error: "Please provide a valid YouTube URL" });
+  if (
+    !url ||
+    (!url.includes("youtube.com") && !url.includes("instagram.com") && !url.includes("facebook.com") )
+  ) {
+    return res
+      .status(400)
+      .json({ error: "Please provide a valid YouTube or Instagram URL" });
   }
 
   const videoId = url.substring(url.lastIndexOf("/") + 1);
@@ -31,7 +38,7 @@ exports.downloadController = async (req, res) => {
 
     // Use youtube-dl to download video and audio in parallel
     const videoPromise = youtubedl(url, {
-      format: "bestvideo[height<=1440][ext=mp4]/best",
+      format: "bestvideo[height>=1920][ext=mp4]/best",
       output: path.join(outputPath, `${outputTemplate}-video.mp4`),
     });
 
@@ -75,6 +82,20 @@ exports.downloadController = async (req, res) => {
     }
   }
 };
+
+// exports.downloadController = async (req, res) => {
+//   const { url } = req.body;
+
+//   // alldown(url).then((data) => {
+//   //   console.log(data);
+//   // });
+
+//   const dataList = await instagramDl(url);
+//   console.log(dataList);
+
+//   // let URL = await ytdown("https://www.youtube.com/watch?v=reuUDX3_T2Q");
+//   // console.log(URL);
+// };
 
 exports.deleteController = async (req, res) => {
   const { videos } = req.body;
