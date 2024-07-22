@@ -4,8 +4,9 @@ const youtubedl = require("youtube-dl-exec");
 const ffmpegPath = require("ffmpeg-static");
 const ffmpeg = require("fluent-ffmpeg");
 const axios = require("axios");
+const { execFile } = require("child_process");
 // const { alldown, ytdown } = require("nayan-media-downloader");
-const instagramDl = require("@sasmeee/igdl");
+// const instagramDl = require("@sasmeee/igdl");
 
 // Set the path to the ffmpeg binary
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -13,14 +14,15 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 exports.downloadController = async (req, res) => {
   const { url } = req.body;
 
-  // Check if URL is a YouTube link
   if (
     !url ||
-    (!url.includes("youtube.com") && !url.includes("instagram.com") && !url.includes("facebook.com") )
+    (!url.includes("youtube.com") &&
+      !url.includes("instagram.com") &&
+      !url.includes("facebook.com"))
   ) {
-    return res
-      .status(400)
-      .json({ error: "Please provide a valid YouTube or Instagram URL" });
+    return res.status(400).json({
+      error: "Please provide a valid YouTube, Instagram, or Facebook URL",
+    });
   }
 
   const videoId = url.substring(url.lastIndexOf("/") + 1);
@@ -29,43 +31,78 @@ exports.downloadController = async (req, res) => {
   try {
     const timestamp = Date.now();
     const outputPath = path.resolve(__dirname, "../downloads");
+
     const outputTemplate = `${sanitizedVideoId}-${timestamp}`;
-    const outputFile = path.join(outputPath, `${outputTemplate}.mp4`);
+    const videoOutputFile = path.join(
+      outputPath,
+      `${outputTemplate}-video.mp4`
+    );
+    const audioOutputFile = path.join(
+      outputPath,
+      `${outputTemplate}-audio.m4a`
+    );
+    const finalOutputFile = path.join(outputPath, `${outputTemplate}.mp4`);
 
     if (!fs.existsSync(outputPath)) {
-      fs.mkdirSync(outputPath);
+      fs.mkdirSync(outputPath, { recursive: true });
     }
 
-    // Use youtube-dl to download video and audio in parallel
-    const videoPromise = youtubedl(url, {
-      format: "bestvideo[height>=1920][ext=mp4]/best",
-      output: path.join(outputPath, `${outputTemplate}-video.mp4`),
-    });
+    // Function to execute youtube-dl command
+    const execPromise = (cmd, args) =>
+      new Promise((resolve, reject) => {
+        execFile(cmd, args, (error, stdout, stderr) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(stdout);
+          }
+        });
+      });
 
-    const audioPromise = youtubedl(url, {
-      format: "bestaudio[ext=m4a]/best",
-      output: path.join(outputPath, `${outputTemplate}-audio.m4a`),
-    });
+    const ytdlPath = path.resolve(
+      __dirname,
+      "../node_modules/youtube-dl-exec/bin/yt-dlp.exe"
+    );
 
-    await Promise.all([videoPromise, audioPromise]);
+    // Download highest quality video and audio using youtube-dl
+    const videoArgs = [
+      "--format",
+      "bestvideo[ext=mp4]/best",
+      "--output",
+      videoOutputFile,
+      url,
+    ];
+    const audioArgs = [
+      "--format",
+      "bestaudio[ext=m4a]/best",
+      "--output",
+      audioOutputFile,
+      url,
+    ];
+
+    await Promise.all([
+      execPromise(ytdlPath, videoArgs),
+      execPromise(ytdlPath, audioArgs),
+    ]);
 
     // Merge video and audio using ffmpeg
     ffmpeg()
-      .input(path.join(outputPath, `${outputTemplate}-video.mp4`))
-      .input(path.join(outputPath, `${outputTemplate}-audio.m4a`))
-      .outputOptions("-c:v copy")
-      .outputOptions("-c:a aac")
-      .output(outputFile)
+      .input(videoOutputFile)
+      .input(audioOutputFile)
+      .outputOptions("-c:v copy") // Avoid re-encoding video
+      .outputOptions("-c:a aac") // Use AAC codec for audio
+      .outputOptions("-b:a 192k") // Set audio bitrate to 192k
+      .output(finalOutputFile)
       .on("end", () => {
         // Clean up temporary files
         try {
-          fs.unlinkSync(path.join(outputPath, `${outputTemplate}-video.mp4`));
-          fs.unlinkSync(path.join(outputPath, `${outputTemplate}-audio.m4a`));
+          fs.unlinkSync(videoOutputFile);
+          fs.unlinkSync(audioOutputFile);
         } catch (err) {
           console.error("Error cleaning up temporary files:", err);
         }
 
-        res.status(200).json(path.basename(outputFile));
+        res.status(200).json(path.basename(finalOutputFile));
       })
       .on("error", (err) => {
         console.error("Error merging video and audio:", err);
