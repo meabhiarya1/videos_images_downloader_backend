@@ -6,6 +6,6 @@ const {
 } = require("../controller/downloadController");
 
 router.post("/download/video", downloadController);
-router.post("/delete/video", deleteController);
+// router.post("/delete/video", deleteController);
 
 module.exports = router;
