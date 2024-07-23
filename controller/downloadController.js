@@ -61,7 +61,7 @@ exports.downloadController = async (req, res) => {
 
     const ytdlPath = path.resolve(
       __dirname,
-      "node_modules/youtube-dl-exec/bin/yt-dlp.exe"
+      "../node_modules/youtube-dl-exec/bin/yt-dlp"
     );
 
     console.log("ytdlPath path",ytdlPath);
