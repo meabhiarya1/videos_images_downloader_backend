@@ -126,6 +126,7 @@ exports.downloadController = async (req, res) => {
 
   const finalOutputFile = path.join(__dirname, "../downloads/default.mp4");
   console.log(path.basename(finalOutputFile))
+  console.log(finalOutputFile)
   res.status(200).json(path.basename(finalOutputFile));
   // const dataList = await instagramDl(url);
   // console.log(dataList);
