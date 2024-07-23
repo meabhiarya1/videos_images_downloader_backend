@@ -13,19 +13,19 @@ ffmpeg.setFfmpegPath(ffmpegPath);
 
 exports.downloadController = async (req, res) => {
   const { url } = req.body;
-
+  const modifiedUrl = url.endsWith("/") ? url.slice(0, -1) : url;
   if (
-    !url ||
-    (!url.includes("youtube.com") &&
-      !url.includes("instagram.com") &&
-      !url.includes("facebook.com"))
+    !modifiedUrl ||
+    (!modifiedUrl.includes("youtube.com") &&
+      !modifiedUrl.includes("instagram.com") &&
+      !modifiedUrl.includes("facebook.com"))
   ) {
     return res.status(400).json({
       error: "Please provide a valid YouTube, Instagram, or Facebook URL",
     });
   }
 
-  const videoId = url.substring(url.lastIndexOf("/") + 1);
+  const videoId = modifiedUrl.substring(modifiedUrl.lastIndexOf("/") + 1);
   const sanitizedVideoId = videoId.replace(/\?/g, "");
 
   try {
@@ -61,8 +61,10 @@ exports.downloadController = async (req, res) => {
 
     const ytdlPath = path.resolve(
       __dirname,
-      "../node_modules/youtube-dl-exec/bin/yt-dlp.exe"
+      "node_modules/youtube-dl-exec/bin/yt-dlp.exe"
     );
+
+    console.log("ytdlPath path",ytdlPath);
 
     // Download highest quality video and audio using youtube-dl
     const videoArgs = [
@@ -70,14 +72,14 @@ exports.downloadController = async (req, res) => {
       "bestvideo[ext=mp4]/best",
       "--output",
       videoOutputFile,
-      url,
+      modifiedUrl,
     ];
     const audioArgs = [
       "--format",
       "bestaudio[ext=m4a]/best",
       "--output",
       audioOutputFile,
-      url,
+      modifiedUrl,
     ];
 
     await Promise.all([
@@ -129,9 +131,6 @@ exports.downloadController = async (req, res) => {
 
 //   const dataList = await instagramDl(url);
 //   console.log(dataList);
-
-//   // let URL = await ytdown("https://www.youtube.com/watch?v=reuUDX3_T2Q");
-//   // console.log(URL);
 // };
 
 exports.deleteController = async (req, res) => {
